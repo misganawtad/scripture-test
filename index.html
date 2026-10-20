@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Scripture Memory Test</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+  <h1 id="app-title"></h1>
+
+  <!-- 1. SETUP -->
+  <section id="setup">
+    <form id="setup-form" autocomplete="off">
+      <fieldset>
+        <legend>Language / Afaan</legend>
+        <div class="segs" id="opt-lang"></div>
+      </fieldset>
+      <fieldset>
+        <legend data-i18n="verseSet"></legend>
+        <div class="segs" id="opt-set"></div>
+      </fieldset>
+      <div class="row">
+        <label class="field">
+          <span data-i18n="section"></span>
+          <select id="opt-section"></select>
+        </label>
+        <label class="field">
+          <span data-i18n="questions"></span>
+          <select id="opt-count"></select>
+        </label>
+      </div>
+      <label class="check"><input type="checkbox" id="opt-shuffle" checked> <span data-i18n="shuffle"></span></label>
+      <label class="check"><input type="checkbox" id="opt-strict"> <span data-i18n="strict"></span></label>
+      <p class="note" data-i18n="capsNote"></p>
+      <p id="setup-msg" class="msg" hidden></p>
+      <button type="submit" class="primary" id="btn-start" data-i18n="start"></button>
+    </form>
+  </section>
+
+  <!-- 2. TEST: all questions on one page, one Submit button -->
+  <section id="test" hidden>
+    <div class="viewer" id="viewer-banner" hidden></div>
+    <div class="score-box" id="score-box" hidden>
+      <div class="score-big" id="score-big"></div>
+      <div id="score-sub"></div>
+    </div>
+    <div class="share-box" id="share-box" hidden>
+      <h2 data-i18n="shareHead"></h2>
+      <label class="field"><span data-i18n="yourName"></span><input type="text" id="share-name" autocomplete="name"></label>
+      <div class="actions">
+        <a class="btn primary" id="btn-whatsapp" href="#" target="_blank" rel="noopener" data-i18n="whatsapp"></a>
+        <button type="button" class="secondary" id="btn-share" data-i18n="shareOther" hidden></button>
+        <button type="button" class="secondary" id="btn-copy" data-i18n="copyMsg"></button>
+      </div>
+      <p class="msg" id="share-msg" hidden></p>
+    </div>
+    <p class="legend" id="legend" hidden></p>
+    <div id="questions"></div>
+    <div class="actions">
+      <button type="button" class="primary" id="btn-submit" data-i18n="submit"></button>
+      <button type="button" class="primary" id="btn-retry" data-i18n="retryMissed" hidden></button>
+      <button type="button" class="secondary" id="btn-restart" data-i18n="startOver" hidden></button>
+    </div>
+  </section>
+</main>
+
+<!-- VERSE DATA: one file per language and set. To add another set, add a file and a line here. -->
+<script src="data/en-60.js"></script>
+<script src="data/en-242.js"></script>
+<script src="data/or-60.js"></script>
+<script src="data/or-242.js"></script>
+<script src="data/god-names.js"></script>
+
+<script src="strings.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
