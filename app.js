@@ -220,8 +220,6 @@
     $("opt-count").innerHTML = html;
     if (state.count !== "all" && opts.map(String).indexOf(state.count) < 0) { state.count = "all"; $("opt-count").value = "all"; }
 
-    $("opt-shuffle").checked = state.shuffle;
-    $("opt-strict").checked = state.strict;
     $("btn-start").disabled = pool.length === 0;
     $("setup-msg").hidden = pool.length > 0;
     $("setup-msg").textContent = t("noVerses");
@@ -453,8 +451,6 @@
     else if (el.name === "set") { state.set = el.value; state.section = "all"; }
     else if (el.id === "opt-section") state.section = el.value;
     else if (el.id === "opt-count") state.count = el.value;
-    else if (el.id === "opt-shuffle") state.shuffle = el.checked;
-    else if (el.id === "opt-strict") state.strict = el.checked;
     renderSetup();
   });
   $("setup-form").addEventListener("submit", function (e) { e.preventDefault(); startFromSetup(); });
@@ -490,6 +486,13 @@
     if (location.hash) history.replaceState(null, "", location.pathname + location.search);
     state.strict = false;
     show("setup"); renderSetup();
+  });
+
+  // Shuffle and Strict options were removed (order is always shuffled, marking is never strict).
+  // This also hides them if an older index.html is still on the website.
+  ["opt-shuffle", "opt-strict"].forEach(function (id) {
+    var box = $(id), label = box && box.closest("label");
+    if (label) label.parentNode.removeChild(label);
   });
 
   renderSetup();
