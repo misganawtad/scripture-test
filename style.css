@@ -114,7 +114,7 @@ a.btn:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 .lrow span.t { color: var(--muted); }
 
 /* ---- Choose your own verses ---- */
-input[type=search] { font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 9px 10px; width: 100%; }
+input[type=search] { font: inherit; font-weight: 400; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 9px 10px; width: 100%; }
 input[type=search]:focus-visible { outline: 3px solid var(--accent); outline-offset: 1px; }
 .pick-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 12px 0 8px; }
 .pick-bar #pick-count { flex: 1 1 100%; font-weight: 600; }

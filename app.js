@@ -8,6 +8,7 @@
   ];
   var SETS = ["60", "242"];          // must match the data file names: data/<lang>-<set>.js
   var COUNT_CHOICES = [3, 5, 10, 20];   // plus "All"
+  var MIN_PICKED = 1;                // fewest verses allowed when you choose your own
   var FIELDS = ["title", "ref", "body"];
   var FIELD_LABEL = { title: "fieldTitle", ref: "fieldRef", body: "fieldBody" };
 
@@ -69,7 +70,9 @@
   // ---------- State ----------
   var state = {
     lang: "en", set: "60", given: "ref", section: "all", count: "10",
-    shuffle: true, strict: false, run: null
+    shuffle: true, strict: false, run: null,
+    mode: "random",     // "random" = the system chooses, "pick" = I choose the verses
+    picked: {}          // my chosen verses, kept per language and set: { "en-60": { 0: true, 5: true } }
   };
   function currentItems() { return DATA[state.lang][state.set] || []; }
 
@@ -206,6 +209,12 @@
       return radio("set", s, t("verses", { n: n }), state.set === s, !n);
     }).join("");
 
+    $("opt-mode").innerHTML =
+      radio("mode", "random", t("modeRandom"), state.mode === "random") +
+      radio("mode", "pick", t("modePick"), state.mode === "pick");
+    $("random-opts").hidden = state.mode !== "random";
+    $("pick-opts").hidden = state.mode !== "pick";
+
     var items = currentItems();
     var groups = [];
     items.forEach(function (it) { if (groups.indexOf(it.group) < 0) groups.push(it.group); });
@@ -220,9 +229,86 @@
     $("opt-count").innerHTML = html;
     if (state.count !== "all" && opts.map(String).indexOf(state.count) < 0) { state.count = "all"; $("opt-count").value = "all"; }
 
-    $("btn-start").disabled = pool.length === 0;
-    $("setup-msg").hidden = pool.length > 0;
-    $("setup-msg").textContent = t("noVerses");
+    if (state.mode === "pick") renderPicker();
+    refreshStart();
+  }
+
+  // Start button + message: depends on random / pick mode
+  function refreshStart() {
+    var ok, msg;
+    if (state.mode === "pick") {
+      ok = pickedCount() >= MIN_PICKED;
+      msg = t("pickAtLeast", { n: MIN_PICKED });
+    } else {
+      ok = poolItems().length > 0;
+      msg = t("noVerses");
+    }
+    $("btn-start").disabled = !ok;
+    $("setup-msg").hidden = ok;
+    $("setup-msg").textContent = msg;
+  }
+
+  // ---------- Choose my own verses ----------
+  function selKey() { return state.lang + "-" + state.set; }
+  function getSel() { return state.picked[selKey()] || (state.picked[selKey()] = {}); }
+  function pickedCount() { return Object.keys(getSel()).length; }
+
+  function renderPicker() {
+    var items = currentItems(), sel = getSel(), groups = [], byName = {};
+    items.forEach(function (it, i) {
+      if (!byName.hasOwnProperty(it.group)) { byName[it.group] = groups.length; groups.push({ name: it.group, idx: [] }); }
+      groups[byName[it.group]].idx.push(i);
+    });
+    $("pick-list").innerHTML = groups.map(function (g, gi) {
+      var h = '<details class="pgroup" data-g="' + gi + '"><summary><span>' + esc(g.name) + '</span><span class="gcount"></span></summary>';
+      h += '<label class="prow gall"><input type="checkbox" class="gsel" data-g="' + gi + '"><span>' + esc(t("selectSection")) + "</span></label>";
+      g.idx.forEach(function (i) {
+        h += '<label class="prow" data-i="' + i + '"><input type="checkbox" class="psel" data-i="' + i + '"' + (sel[i] ? " checked" : "") + ">" +
+          '<span><span class="pref">' + esc(items[i].ref) + '</span><span class="ptitle">' + esc(items[i].title) + "</span></span></label>";
+      });
+      return h + "</details>";
+    }).join("");
+    applyPickFilter();
+  }
+
+  function pickKey(s) {
+    return String(s).toLocaleLowerCase().replace(/\u1361/g, ":").replace(/[\u2018\u2019`]/g, "'").replace(/\s+/g, " ").trim();
+  }
+
+  // Hide verses that do not match the search box; refresh counts and tick boxes.
+  function applyPickFilter() {
+    var q = pickKey($("pick-search").value), items = currentItems(), sel = getSel(), anyShown = false;
+    document.querySelectorAll("#pick-list .pgroup").forEach(function (box) {
+      var shown = 0, total = 0, chosen = 0, shownChosen = 0;
+      box.querySelectorAll(".prow[data-i]").forEach(function (row) {
+        var i = +row.getAttribute("data-i"), it = items[i];
+        var match = !q || pickKey(it.ref + " " + it.title).indexOf(q) >= 0;
+        row.hidden = !match;
+        total++;
+        if (sel[i]) chosen++;
+        if (match) { shown++; if (sel[i]) shownChosen++; }
+      });
+      box.hidden = shown === 0;
+      if (shown) anyShown = true;
+      if (q && shown) box.open = true;
+      box.querySelector(".gcount").textContent = chosen + " / " + total;
+      var g = box.querySelector(".gsel");
+      g.checked = shown > 0 && shownChosen === shown;
+      g.indeterminate = shownChosen > 0 && shownChosen < shown;
+    });
+    $("pick-empty").hidden = anyShown;
+    $("pick-count").textContent = t("selectedCount", { n: pickedCount() });
+    refreshStart();
+  }
+
+  function setShown(box, on) {   // tick / untick every verse that is currently shown in one section (or all sections)
+    var sel = getSel();
+    box.querySelectorAll(".prow[data-i]").forEach(function (row) {
+      if (row.hidden) return;
+      var i = row.getAttribute("data-i");
+      if (on) sel[i] = true; else delete sel[i];
+      row.querySelector(".psel").checked = on;
+    });
   }
 
   function poolItems() {
@@ -250,9 +336,17 @@
   }
 
   function startFromSetup() {
-    var pool = poolItems();
+    var pool, n;
+    if (state.mode === "pick") {
+      var sel = getSel();
+      pool = currentItems().filter(function (it, i) { return sel[i]; });
+      if (pool.length < MIN_PICKED) return;
+      n = pool.length;
+    } else {
+      pool = poolItems();
+      n = state.count === "all" ? pool.length : Math.min(parseInt(state.count, 10), pool.length);
+    }
     if (state.shuffle) pool = shuffle(pool);
-    var n = state.count === "all" ? pool.length : Math.min(parseInt(state.count, 10), pool.length);
     startRun(pool.slice(0, n));
   }
 
@@ -447,12 +541,31 @@
   // ---------- Wire up ----------
   $("setup-form").addEventListener("change", function (e) {
     var el = e.target;
-    if (el.name === "lang") { state.lang = el.value; state.section = "all"; }
+    if (el.name === "mode") state.mode = el.value;
+    else if (el.name === "lang") { state.lang = el.value; state.section = "all"; }
     else if (el.name === "set") { state.set = el.value; state.section = "all"; }
     else if (el.id === "opt-section") state.section = el.value;
     else if (el.id === "opt-count") state.count = el.value;
     renderSetup();
   });
+  // Choosing verses: these events are handled here and do not rebuild the whole setup page.
+  $("pick-opts").addEventListener("change", function (e) {
+    e.stopPropagation();
+    var el = e.target, sel = getSel();
+    if (el.classList.contains("psel")) {
+      var i = el.getAttribute("data-i");
+      if (el.checked) sel[i] = true; else delete sel[i];
+    } else if (el.classList.contains("gsel")) {
+      setShown(el.closest(".pgroup"), el.checked);
+    }
+    applyPickFilter();
+  });
+  $("pick-search").addEventListener("input", applyPickFilter);
+  $("pick-all").addEventListener("click", function () {
+    document.querySelectorAll("#pick-list .pgroup").forEach(function (box) { setShown(box, true); });
+    applyPickFilter();
+  });
+  $("pick-none").addEventListener("click", function () { state.picked[selKey()] = {}; renderPicker(); });
   $("setup-form").addEventListener("submit", function (e) { e.preventDefault(); startFromSetup(); });
   $("btn-submit").addEventListener("click", submitAll);
   var nameTimer;
