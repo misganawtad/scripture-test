@@ -251,64 +251,46 @@
   // ---------- Choose my own verses ----------
   function selKey() { return state.lang + "-" + state.set; }
   function getSel() { return state.picked[selKey()] || (state.picked[selKey()] = {}); }
-  function pickedCount() { return Object.keys(getSel()).length; }
+  function pickedCount() { var items = currentItems(); return Object.keys(getSel()).filter(function (i) { return items[i]; }).length; }
 
-  function renderPicker() {
-    var items = currentItems(), sel = getSel(), groups = [], byName = {};
-    items.forEach(function (it, i) {
-      if (!byName.hasOwnProperty(it.group)) { byName[it.group] = groups.length; groups.push({ name: it.group, idx: [] }); }
-      groups[byName[it.group]].idx.push(i);
-    });
-    $("pick-list").innerHTML = groups.map(function (g, gi) {
-      var h = '<details class="pgroup" data-g="' + gi + '"><summary><span>' + esc(g.name) + '</span><span class="gcount"></span></summary>';
-      h += '<label class="prow gall"><input type="checkbox" class="gsel" data-g="' + gi + '"><span>' + esc(t("selectSection")) + "</span></label>";
-      g.idx.forEach(function (i) {
-        h += '<label class="prow" data-i="' + i + '"><input type="checkbox" class="psel" data-i="' + i + '"' + (sel[i] ? " checked" : "") + ">" +
-          '<span><span class="pref">' + esc(items[i].ref) + '</span><span class="ptitle">' + esc(items[i].title) + "</span></span></label>";
-      });
-      return h + "</details>";
-    }).join("");
-    applyPickFilter();
-  }
+  var MAX_SHOWN = 30;   // most suggestions shown at once
+
+  function renderPicker() { renderSuggestions(); renderChosen(); }
 
   function pickKey(s) {
     return String(s).toLocaleLowerCase().replace(/\u1361/g, ":").replace(/[\u2018\u2019`]/g, "'").replace(/\s+/g, " ").trim();
   }
 
-  // Hide verses that do not match the search box; refresh counts and tick boxes.
-  function applyPickFilter() {
-    var q = pickKey($("pick-search").value), items = currentItems(), sel = getSel(), anyShown = false;
-    document.querySelectorAll("#pick-list .pgroup").forEach(function (box) {
-      var shown = 0, total = 0, chosen = 0, shownChosen = 0;
-      box.querySelectorAll(".prow[data-i]").forEach(function (row) {
-        var i = +row.getAttribute("data-i"), it = items[i];
-        var match = !q || pickKey(it.ref + " " + it.title).indexOf(q) >= 0;
-        row.hidden = !match;
-        total++;
-        if (sel[i]) chosen++;
-        if (match) { shown++; if (sel[i]) shownChosen++; }
-      });
-      box.hidden = shown === 0;
-      if (shown) anyShown = true;
-      if (q && shown) box.open = true;
-      box.querySelector(".gcount").textContent = chosen + " / " + total;
-      var g = box.querySelector(".gsel");
-      g.checked = shown > 0 && shownChosen === shown;
-      g.indeterminate = shownChosen > 0 && shownChosen < shown;
-    });
-    $("pick-empty").hidden = anyShown;
-    $("pick-count").textContent = t("selectedCount", { n: pickedCount() });
+  // Suggestions: verses whose reference or title contains what you typed. Nothing is listed until you type.
+  function renderSuggestions() {
+    var q = pickKey($("pick-search").value), items = currentItems(), sel = getSel(), found = [];
+    if (q) items.forEach(function (it, i) { if (pickKey(it.ref + " " + it.title).indexOf(q) >= 0) found.push(i); });
+    $("pick-suggest").hidden = found.length === 0;
+    $("pick-empty").hidden = !q || found.length > 0;
+    $("pick-list").innerHTML = found.slice(0, MAX_SHOWN).map(function (i) {
+      return '<label class="prow"><input type="checkbox" class="psel" data-i="' + i + '"' + (sel[i] ? " checked" : "") + ">" +
+        '<span><span class="pref">' + esc(items[i].ref) + '</span><span class="ptitle">' + esc(items[i].title) + "</span></span></label>";
+    }).join("");
+    $("pick-more").hidden = found.length <= MAX_SHOWN;
+    $("pick-more").textContent = t("showingFirst", { n: MAX_SHOWN });
+  }
+
+  // Your chosen verses, with a button to remove each one.
+  function renderChosen() {
+    var items = currentItems(), sel = getSel();
+    var idx = Object.keys(sel).map(Number).filter(function (i) { return items[i]; }).sort(function (x, y) { return x - y; });
+    $("chosen").hidden = idx.length === 0;
+    $("pick-count").textContent = t("selectedCount", { n: idx.length });
+    $("chosen-list").innerHTML = idx.map(function (i) {
+      return '<div class="crow"><span><span class="pref">' + esc(items[i].ref) + '</span><span class="ptitle">' + esc(items[i].title) + "</span></span>" +
+        '<button type="button" class="rm" data-i="' + i + '" aria-label="' + esc(t("remove") + " " + items[i].ref) + '">&times;</button></div>';
+    }).join("");
     refreshStart();
   }
 
-  function setShown(box, on) {   // tick / untick every verse that is currently shown in one section (or all sections)
+  function syncSuggestionChecks() {
     var sel = getSel();
-    box.querySelectorAll(".prow[data-i]").forEach(function (row) {
-      if (row.hidden) return;
-      var i = row.getAttribute("data-i");
-      if (on) sel[i] = true; else delete sel[i];
-      row.querySelector(".psel").checked = on;
-    });
+    document.querySelectorAll("#pick-list .psel").forEach(function (box) { box.checked = !!sel[box.getAttribute("data-i")]; });
   }
 
   function poolItems() {
@@ -548,24 +530,29 @@
     else if (el.id === "opt-count") state.count = el.value;
     renderSetup();
   });
-  // Choosing verses: these events are handled here and do not rebuild the whole setup page.
+  // Choosing verses: handled here, so the setup page is not rebuilt.
   $("pick-opts").addEventListener("change", function (e) {
     e.stopPropagation();
-    var el = e.target, sel = getSel();
-    if (el.classList.contains("psel")) {
-      var i = el.getAttribute("data-i");
-      if (el.checked) sel[i] = true; else delete sel[i];
-    } else if (el.classList.contains("gsel")) {
-      setShown(el.closest(".pgroup"), el.checked);
-    }
-    applyPickFilter();
+    var el = e.target;
+    if (!el.classList.contains("psel")) return;
+    var sel = getSel(), i = el.getAttribute("data-i");
+    if (el.checked) sel[i] = true; else delete sel[i];
+    renderChosen();
   });
-  $("pick-search").addEventListener("input", applyPickFilter);
+  $("pick-search").addEventListener("input", renderSuggestions);
   $("pick-all").addEventListener("click", function () {
-    document.querySelectorAll("#pick-list .pgroup").forEach(function (box) { setShown(box, true); });
-    applyPickFilter();
+    var sel = getSel();
+    document.querySelectorAll("#pick-list .psel").forEach(function (box) { sel[box.getAttribute("data-i")] = true; box.checked = true; });
+    renderChosen();
   });
   $("pick-none").addEventListener("click", function () { state.picked[selKey()] = {}; renderPicker(); });
+  $("chosen-list").addEventListener("click", function (e) {
+    var b = e.target.closest(".rm");
+    if (!b) return;
+    delete getSel()[b.getAttribute("data-i")];
+    renderChosen();
+    syncSuggestionChecks();
+  });
   $("setup-form").addEventListener("submit", function (e) { e.preventDefault(); startFromSetup(); });
   $("btn-submit").addEventListener("click", submitAll);
   var nameTimer;

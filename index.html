@@ -38,20 +38,29 @@
         </label>
       </div>
 
-      <!-- I choose the verses -->
+      <!-- I choose the verses: type to search, tick the suggestions you want -->
       <div id="pick-opts" hidden>
         <label class="field">
           <span data-i18n="search"></span>
           <input type="search" id="pick-search" autocomplete="off" spellcheck="false">
         </label>
-        <div class="pick-bar">
-          <span id="pick-count"></span>
-          <button type="button" class="secondary small" id="pick-all" data-i18n="selectShown"></button>
-          <button type="button" class="secondary small" id="pick-none" data-i18n="clearAll"></button>
+        <div id="pick-suggest" hidden>
+          <div class="pick-bar">
+            <button type="button" class="secondary small" id="pick-all" data-i18n="selectShown"></button>
+          </div>
+          <div id="pick-list"></div>
+          <p class="note" id="pick-more" hidden></p>
         </div>
-        <div id="pick-list"></div>
         <p class="note" id="pick-empty" data-i18n="noMatch" hidden></p>
+        <div id="chosen" hidden>
+          <div class="pick-bar">
+            <span id="pick-count"></span>
+            <button type="button" class="secondary small" id="pick-none" data-i18n="clearAll"></button>
+          </div>
+          <div id="chosen-list"></div>
+        </div>
       </div>
+
       <p class="note" data-i18n="capsNote"></p>
       <p id="setup-msg" class="msg" hidden></p>
       <button type="submit" class="primary" id="btn-start" data-i18n="start"></button>
