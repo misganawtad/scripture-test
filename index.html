@@ -21,7 +21,13 @@
         <legend data-i18n="verseSet"></legend>
         <div class="segs" id="opt-set"></div>
       </fieldset>
-      <div class="row">
+      <fieldset>
+        <legend data-i18n="mode"></legend>
+        <div class="segs" id="opt-mode"></div>
+      </fieldset>
+
+      <!-- Random verses -->
+      <div class="row" id="random-opts">
         <label class="field">
           <span data-i18n="section"></span>
           <select id="opt-section"></select>
@@ -31,7 +37,21 @@
           <select id="opt-count"></select>
         </label>
       </div>
-     
+
+      <!-- I choose the verses -->
+      <div id="pick-opts" hidden>
+        <label class="field">
+          <span data-i18n="search"></span>
+          <input type="search" id="pick-search" autocomplete="off" spellcheck="false">
+        </label>
+        <div class="pick-bar">
+          <span id="pick-count"></span>
+          <button type="button" class="secondary small" id="pick-all" data-i18n="selectShown"></button>
+          <button type="button" class="secondary small" id="pick-none" data-i18n="clearAll"></button>
+        </div>
+        <div id="pick-list"></div>
+        <p class="note" id="pick-empty" data-i18n="noMatch" hidden></p>
+      </div>
       <p class="note" data-i18n="capsNote"></p>
       <p id="setup-msg" class="msg" hidden></p>
       <button type="submit" class="primary" id="btn-start" data-i18n="start"></button>
