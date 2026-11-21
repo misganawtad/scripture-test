@@ -61,15 +61,11 @@
     SETS.forEach(function (s) { ALL[l.code] = ALL[l.code].concat(DATA[l.code][s] || []); });
   });
 
-  // Names of God (data/god-names.js): their capital letters are checked, all other capitals are ignored.
-  var GODS = {};
-  LANGS.forEach(function (l) {
-    var raw = (window.GOD_NAMES || {})[l.code] || "";
-    GODS[l.code] = raw.split(",").map(function (x) { return x.trim().toLocaleLowerCase(); }).filter(Boolean);
-  });
+  // The only capital letter that is checked: the word "God" in the English test.
+  // Everywhere else capital letters are ignored (and never checked in Afaan Oromoo).
   function isGodName(key) {
-    var lang = state.run ? state.run.lang : state.lang, list = GODS[lang] || [];
-    return list.some(function (n) { return lang === "en" ? (key === n || key === n + "s") : key.indexOf(n) === 0; });
+    var lang = state.run ? state.run.lang : state.lang;
+    return lang === "en" && (key === "god" || key === "gods");
   }
 
   // ---------- State ----------
