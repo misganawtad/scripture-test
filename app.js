@@ -6,8 +6,7 @@
     { code: "en", name: "English" },
     { code: "or", name: "Afaan Oromoo" }
   ];
-  var SETS = ["60", "242"];          // must match the data file names: data/<lang>-<set>.js
-  var COUNT_CHOICES = [3, 5, 10, 20];   // plus "All"
+  var SETS = ["60", "242"];          // data files that are searched together: data/<lang>-<set>.js
   var MIN_PICKED = 1;                // fewest verses allowed when you choose your own
   var FIELDS = ["title", "ref", "body"];
   var FIELD_LABEL = { title: "fieldTitle", ref: "fieldRef", body: "fieldBody" };
@@ -55,6 +54,12 @@
     DATA[l.code] = {};
     SETS.forEach(function (s) { DATA[l.code][s] = parseSet(l.code + "-" + s); });
   });
+  // One list per language with the verses of every set (the search looks in all of them)
+  var ALL = {};
+  LANGS.forEach(function (l) {
+    ALL[l.code] = [];
+    SETS.forEach(function (s) { ALL[l.code] = ALL[l.code].concat(DATA[l.code][s] || []); });
+  });
 
   // Names of God (data/god-names.js): their capital letters are checked, all other capitals are ignored.
   var GODS = {};
@@ -69,12 +74,11 @@
 
   // ---------- State ----------
   var state = {
-    lang: "en", set: "60", given: "ref", section: "all", count: "10",
+    lang: "en", given: "ref",
     shuffle: true, strict: false, run: null,
-    mode: "random",     // "random" = the system chooses, "pick" = I choose the verses
-    picked: {}          // my chosen verses, kept per language and set: { "en-60": { 0: true, 5: true } }
+    picked: {}          // my chosen verses, kept per language: { "en": { 0: true, 5: true } }
   };
-  function currentItems() { return DATA[state.lang][state.set] || []; }
+  function currentItems() { return ALL[state.lang] || []; }
 
   // ---------- Marking ----------
   // Turn text into word tokens {raw, key, glue}. key is what gets compared.
@@ -143,7 +147,7 @@
   // Verses that share the same "given" text (e.g. same title in the same section).
   function candidates(q, given) {
     var sameKey = tokenize(q[given], false, given === "ref").map(function (x) { return x.key; }).join(" ");
-    return (DATA[state.run.lang][state.run.set] || []).filter(function (c) {
+    return (ALL[state.run.lang] || []).filter(function (c) {
       if (given === "title" && c.group !== q.group) return false;
       return tokenize(c[given], false, given === "ref").map(function (x) { return x.key; }).join(" ") === sameKey;
     });
@@ -200,56 +204,20 @@
   function renderSetup() {
     applyLanguage();
     $("opt-lang").innerHTML = LANGS.map(function (l) { return radio("lang", l.code, l.name, state.lang === l.code); }).join("");
-
-    // Pick a set that exists in this language
-    var available = SETS.filter(function (s) { return DATA[state.lang][s] && DATA[state.lang][s].length; });
-    if (available.length && available.indexOf(state.set) < 0) state.set = available[0];
-    $("opt-set").innerHTML = SETS.map(function (s) {
-      var n = (DATA[state.lang][s] || []).length;
-      return radio("set", s, t("verses", { n: n }), state.set === s, !n);
-    }).join("");
-
-    $("opt-mode").innerHTML =
-      radio("mode", "random", t("modeRandom"), state.mode === "random") +
-      radio("mode", "pick", t("modePick"), state.mode === "pick");
-    $("random-opts").hidden = state.mode !== "random";
-    $("pick-opts").hidden = state.mode !== "pick";
-
-    var items = currentItems();
-    var groups = [];
-    items.forEach(function (it) { if (groups.indexOf(it.group) < 0) groups.push(it.group); });
-    if (state.section !== "all" && groups.indexOf(state.section) < 0) state.section = "all";
-    $("opt-section").innerHTML = '<option value="all">' + esc(t("allSections")) + "</option>" +
-      groups.map(function (g) { return '<option value="' + esc(g) + '"' + (g === state.section ? " selected" : "") + ">" + esc(g) + "</option>"; }).join("");
-
-    var pool = poolItems();
-    var opts = COUNT_CHOICES.filter(function (c) { return c < pool.length; });
-    var html = opts.map(function (c) { return '<option value="' + c + '"' + (String(c) === state.count ? " selected" : "") + ">" + c + "</option>"; }).join("");
-    html += '<option value="all"' + (state.count === "all" ? " selected" : "") + ">" + esc(t("all", { n: pool.length })) + "</option>";
-    $("opt-count").innerHTML = html;
-    if (state.count !== "all" && opts.map(String).indexOf(state.count) < 0) { state.count = "all"; $("opt-count").value = "all"; }
-
-    if (state.mode === "pick") renderPicker();
+    renderPicker();
     refreshStart();
   }
 
-  // Start button + message: depends on random / pick mode
+  // Start button + message
   function refreshStart() {
-    var ok, msg;
-    if (state.mode === "pick") {
-      ok = pickedCount() >= MIN_PICKED;
-      msg = t("pickAtLeast", { n: MIN_PICKED });
-    } else {
-      ok = poolItems().length > 0;
-      msg = t("noVerses");
-    }
+    var ok = pickedCount() >= MIN_PICKED;
     $("btn-start").disabled = !ok;
     $("setup-msg").hidden = ok;
-    $("setup-msg").textContent = msg;
+    $("setup-msg").textContent = t("pickAtLeast", { n: MIN_PICKED });
   }
 
   // ---------- Choose my own verses ----------
-  function selKey() { return state.lang + "-" + state.set; }
+  function selKey() { return state.lang; }
   function getSel() { return state.picked[selKey()] || (state.picked[selKey()] = {}); }
   function pickedCount() { var items = currentItems(); return Object.keys(getSel()).filter(function (i) { return items[i]; }).length; }
 
@@ -293,14 +261,10 @@
     document.querySelectorAll("#pick-list .psel").forEach(function (box) { box.checked = !!sel[box.getAttribute("data-i")]; });
   }
 
-  function poolItems() {
-    return currentItems().filter(function (it) { return state.section === "all" || it.group === state.section; });
-  }
-
   // ---------- Test (one page, one Submit) ----------
   function startRun(items) {
     state.run = {
-      lang: state.lang, set: state.set, given: state.given, strict: state.strict,
+      lang: state.lang, given: state.given, strict: state.strict,
       required: FIELDS.filter(function (f) { return f !== state.given; }),
       items: items, results: [], submitted: false
     };
@@ -318,18 +282,10 @@
   }
 
   function startFromSetup() {
-    var pool, n;
-    if (state.mode === "pick") {
-      var sel = getSel();
-      pool = currentItems().filter(function (it, i) { return sel[i]; });
-      if (pool.length < MIN_PICKED) return;
-      n = pool.length;
-    } else {
-      pool = poolItems();
-      n = state.count === "all" ? pool.length : Math.min(parseInt(state.count, 10), pool.length);
-    }
-    if (state.shuffle) pool = shuffle(pool);
-    startRun(pool.slice(0, n));
+    var sel = getSel();
+    var pool = currentItems().filter(function (it, i) { return sel[i]; });
+    if (pool.length < MIN_PICKED) return;
+    startRun(shuffle(pool));
   }
 
   function renderQuestions() {
@@ -434,7 +390,7 @@
 
   async function buildLink(name) {
     var r = state.run, base = location.href.split("#")[0];
-    var head = { v: 1, n: name, l: r.lang, s: r.set, d: new Date().toISOString().slice(0, 10) };
+    var head = { v: 1, n: name, l: r.lang, d: new Date().toISOString().slice(0, 10) };
     var full = Object.assign({ k: r.strict ? 1 : 0, q: r.results.map(function (g) {
       return [g.item.ref].concat(r.required.map(function (f) { return g.answers[f]; }));
     }) }, head);
@@ -451,7 +407,7 @@
     var url = await buildLink(name);
     var langName = LANGS.filter(function (l) { return l.code === r.lang; })[0].name;
     var text = t("shareMsg", {
-      name: name || "?", set: t("verses", { n: (DATA[r.lang][r.set] || []).length }), lang: langName,
+      name: name || "?", lang: langName,
       score: r.avg, p: r.perfect, n: r.items.length, url: url
     });
     r.share = { url: url, text: text };
@@ -472,9 +428,9 @@
   // ---------- Open a shared result link ----------
   async function openShared(code) {
     var p = await unpack(code);
-    if (!p || p.v !== 1 || !DATA[p.l] || !DATA[p.l][p.s] || !Array.isArray(p.q)) throw new Error("bad");
-    state.lang = p.l; state.set = p.s; state.strict = !!p.k;
-    var all = DATA[p.l][p.s], items = [], rows = [], missing = 0;
+    if (!p || p.v !== 1 || !ALL[p.l] || !Array.isArray(p.q)) throw new Error("bad");
+    state.lang = p.l; state.strict = !!p.k;
+    var all = ALL[p.l], items = [], rows = [], missing = 0;
     p.q.forEach(function (row) {
       var it = all.filter(function (x) { return x.ref === row[0]; })[0];
       if (it) { items.push(it); rows.push(row); } else missing++;
@@ -493,7 +449,7 @@
       });
       submitAll();
     } else {                                              // scores only
-      state.run = { lang: p.l, set: p.s, items: items, required: [], viewer: true };
+      state.run = { lang: p.l, items: items, required: [], viewer: true };
       show("test");
       $("btn-submit").hidden = true; $("btn-retry").hidden = true; $("share-box").hidden = true;
       var tot = 0, perf = 0;
@@ -517,17 +473,13 @@
   function retryMissed() {
     var r = state.run;
     var missed = r.results.filter(function (g) { return !g.perfect; }).map(function (g) { return g.item; });
-    if (missed.length) { state.lang = r.lang; state.set = r.set; startRun(state.shuffle ? shuffle(missed) : missed); }
+    if (missed.length) { state.lang = r.lang; startRun(shuffle(missed)); }
   }
 
   // ---------- Wire up ----------
   $("setup-form").addEventListener("change", function (e) {
     var el = e.target;
-    if (el.name === "mode") state.mode = el.value;
-    else if (el.name === "lang") { state.lang = el.value; state.section = "all"; }
-    else if (el.name === "set") { state.set = el.value; state.section = "all"; }
-    else if (el.id === "opt-section") state.section = el.value;
-    else if (el.id === "opt-count") state.count = el.value;
+    if (el.name === "lang") state.lang = el.value;
     renderSetup();
   });
   // Choosing verses: handled here, so the setup page is not rebuilt.
